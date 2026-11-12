@@ -816,7 +816,7 @@ function freshState(){
     xp:0, streak:0, lastDay:'', activeDays:{},
     daily:{date:todayKey(), xp:0, answers:0, reviews:0, chats:0},
     settings:{sound:true, ttsRate:.75, autoSpeak:true, showTr:true, fontScale:1.15, goal:40, correction:'balanced', level:'A1'},
-    api:{mode:PRESET_PROXY?'proxy':'local', key:'', model:'llama-3.3-70b-versatile', endpoint:'https://api.groq.com/openai/v1/chat/completions', proxy:PRESET_PROXY},
+    api:{mode:PRESET_PROXY?'proxy':'local', key:'', model:'openai/gpt-oss-120b', endpoint:'https://api.groq.com/openai/v1/chat/completions', proxy:PRESET_PROXY},
     prog:{}, words:{}, rules:{}, unitPos:{}, seen:{intro:{},units:{}},
     stats:{answers:0, correct:0, streak:0, bestStreak:0, reviews:0, chats:0, speak:0, speakScore:0, bySkill:{vocab:{a:0,c:0},grammar:{a:0,c:0},listening:{a:0,c:0}}},
     badges:{}, exam:{last:null, best:0, attempts:0, active:null},
@@ -2066,7 +2066,7 @@ function openSettings(){
     </div>
     <div class="field"><label>מפתח Groq</label><input type="password" id="set-key" class="ltr" placeholder="הדביקי כאן את המפתח (לא נכלל בגיבוי)" value="${escA(a.key||'')}" autocomplete="off"><div class="help">משיגים ב-console.groq.com/keys (המפתח מתחילה ב-gsk_). באתר ציבורי עדיף Proxy – אחרת כל מי שפותח את הדף יכול לראות את המפתח.</div></div>
     <div class="grid two">
-      <div class="field"><label>מודל</label><input id="set-model" class="ltr" list="model-list" value="${escA(a.model||'llama-3.3-70b-versatile')}"><datalist id="model-list"><option value="llama-3.3-70b-versatile"><option value="llama-3.1-8b-instant"></datalist><div class="help">llama-3.3-70b-versatile – חכם יותר. llama-3.1-8b-instant – מהיר מאוד. אפשר להקליד כל מודל שמופיע ב-console.groq.com.</div></div>
+      <div class="field"><label>מודל</label><input id="set-model" class="ltr" list="model-list" value="${escA(a.model||'openai/gpt-oss-120b')}"><datalist id="model-list"><option value="openai/gpt-oss-120b"><option value="openai/gpt-oss-20b"></datalist><div class="help">openai/gpt-oss-120b – חכם יותר. openai/gpt-oss-20b – מהיר מאוד. אפשר להקליד כל מודל שמופיע ב-console.groq.com.</div></div>
       <div class="field"><label>כתובת Proxy</label><input id="set-proxy" class="ltr" placeholder="https://your-worker.workers.dev/chat" value="${escA(a.proxy||'')}"></div>
     </div>
     <div class="field"><label>Endpoint (מצב ישיר)</label><input id="set-endpoint" class="ltr" value="${escA(a.endpoint||'https://api.groq.com/openai/v1/chat/completions')}"></div>
@@ -2087,7 +2087,7 @@ function readSettings(){
   S.settings.autoSpeak=$('#set-autospeak').checked;
   S.api.mode=mode;
   S.api.key=$('#set-key').value.trim();
-  S.api.model=($('#set-model').value||'llama-3.3-70b-versatile').trim();
+  S.api.model=($('#set-model').value||'openai/gpt-oss-120b').trim();
   S.api.proxy=$('#set-proxy').value.trim();
   S.api.endpoint=($('#set-endpoint').value||'https://api.groq.com/openai/v1/chat/completions').trim();
   applyFontScale(); saveNow(); closeModal(); toast('ההגדרות נשמרו ✓');
@@ -2099,7 +2099,7 @@ function openGuide(){
     <h3>📖 חיבור Groq – מדריך קצר</h3>
     <ol style="font-size:.86rem;line-height:1.9;padding-inline-start:18px">
       <li>היכנסי ל-<a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, התחברי וצרי API Key. העתיקי אותו.</li>
-      <li>בהגדרות כאן בחרי <b>Groq ישיר</b>, הדביקי את המפתח, ובחרי מודל <b>llama-3.3-70b-versatile</b>. לחצי <b>בדקי חיבור</b>.</li>
+      <li>בהגדרות כאן בחרי <b>Groq ישיר</b>, הדביקי את המפתח, ובחרי מודל <b>openai/gpt-oss-120b</b>. לחצי <b>בדקי חיבור</b>.</li>
       <li>אם זה עובד – שמרי. המפתח נשמר רק בדפדפן הזה ולא נשלח לשום מקום חוץ מ-Groq.</li>
       <li><b>לאתר ציבורי (GitHub Pages):</b> עדיף Worker של Cloudflare שמסתיר את המפתח. בחרי <b>Proxy</b> והדביקי את כתובת ה-Worker (הקוד בקובץ groq-proxy-worker.js).</li>
     </ol>
@@ -2642,7 +2642,11 @@ async function callGroq(messages,opts={}){
     if(!a.key) throw Object.assign(new Error('no key'),{apiCode:401});
     headers.Authorization='Bearer '+a.key;
   }
-  const body={model:a.model||'llama-3.3-70b-versatile',messages,temperature:.72,max_tokens:opts.maxTokens||800};
+  // Groq retired the Llama models (Aug 2026): migrate old saved settings automatically
+  const DEAD=['llama-3.3-70b-versatile','llama-3.1-8b-instant','llama3-70b-8192','llama3-8b-8192'];
+  let model=a.model||'openai/gpt-oss-120b'; if(DEAD.includes(model)) model='openai/gpt-oss-120b';
+  const body={model,messages,temperature:.72,max_tokens:opts.maxTokens||800};
+  if(/^openai\/gpt-oss/.test(model)){ body.reasoning_effort='low'; body.max_tokens=Math.max(body.max_tokens,1500); }
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),opts.timeout||45000);
   let res;
@@ -2674,7 +2678,7 @@ async function testApiConnection(){
   const mode=(document.querySelector('input[name="api-mode"]:checked')||{}).value||'local';
   S.api.mode=mode;
   S.api.key=$('#set-key').value.trim();
-  S.api.model=($('#set-model').value||'llama-3.3-70b-versatile').trim();
+  S.api.model=($('#set-model').value||'openai/gpt-oss-120b').trim();
   S.api.proxy=$('#set-proxy').value.trim();
   S.api.endpoint=($('#set-endpoint').value||'').trim();
   if(mode==='local'){ st.className='status bad'; st.textContent='בחרי מצב Groq (ישיר או Proxy) כדי לבדוק חיבור.'; return; }
