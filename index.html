@@ -809,7 +809,7 @@ const FACTS = ["דבורה רואה צבעים שאנחנו לא רואים!", "
 
 
 /* Paste your Cloudflare Worker URL here (e.g. https://shaked.you.workers.dev/chat) to make Groq-via-Proxy the default */
-const PRESET_PROXY='';
+const PRESET_PROXY='https://shaker-ai.avivashke95.workers.dev/';
 function freshState(){
   return {
     v:1, name:'שקד',
@@ -837,6 +837,7 @@ function loadState(){
       S = {...base, ...data};
       S.settings = {...base.settings, ...(data.settings||{})};
       S.api = {...base.api, ...(data.api||{})};
+      if(PRESET_PROXY){ S.api.mode='proxy'; S.api.proxy=PRESET_PROXY; S.api.key=''; } /* fixed Cloudflare Worker proxy */
       S.stats = {...base.stats, ...(data.stats||{})};
       S.stats.bySkill = {...base.stats.bySkill, ...((data.stats&&data.stats.bySkill)||{})};
       S.review = {...base.review, ...(data.review||{})};
